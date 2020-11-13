@@ -1,0 +1,144 @@
+---
+title: "Ileostomy Site Carcinoma Literature Review"
+author: "Anthony Morada"
+date: "11/11/2020"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  word_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+## Loading and Cleaning
+
+```{r setup, echo = FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+
+library(readxl)
+library(dplyr)
+library(janitor)
+library(table1)
+library(finalfit)
+
+df <- read_excel("~/THE GUTHRIE CLINIC/Foundation Research Projects - Ileostomy Site Carcinoma/case table.xlsx", na = "NA") 
+df <- df %>%
+  clean_names() %>%
+  filter(!is.na(exclusion))
+
+```
+The table has `r ncol(df)` columns and `r nrow(df)` rows.
+
+## Full-Text Inclusion and Exclusion 
+
+```{r inclusion/exclusion}
+df_i <- df[df$exclusion == "No",]
+df_e <- df[df$exclusion == "Yes",]
+
+ex_cit <- subset(df_e, !(df_e$citation %in% df_i$citation)) %>%
+  select(citation, exclusion_reason) %>%
+  unique()
+```
+
+Our table contains `r length(unique(df$citation))` unique papers 
+
+We included `r nrow(df_i)` patients that were found in `r length(unique(df_i$citation))` unique citations. We excluded `r nrow(ex_cit)` citations. Below is reason for full-text exclusions:  
+```{r printing exclusion reason summary}
+summary(as.factor(ex_cit$exclusion_reason))
+```
+
+## Summary of Data  
+
+Malignant Etiology = Adenocarcinoma, Lymphoma, Melanoma, Neuroendocrine Tumor, Squamous Cell Carcinoma, Verrucous Carcinoma  
+Pre-Malignant Etiology = ESFA, Extramammary Paget Disease  
+  
+```{r creating new column}
+df_i$malignant <- grepl("Adenocarcinoma|Lymphoma|Melanoma|Neuroendocrine Tumor|Squamous Cell Carcinoma|Verrucous Carcinoma", df_i$final_pathology, ignore.case = T)
+df_i$malignant <- gsub(TRUE, "Malignant", df_i$malignant)
+df_i$malignant <- gsub(FALSE, "Pre-malignant", df_i$malignant)
+df_i$malignant <- as.factor(df_i$malignant)
+
+df_i <- df_i %>%
+  mutate(ibd_fap = case_when(index_surgery_indication == "Ulcerative Colitis" ~ "IBD",
+                             index_surgery_indication == "Crohn's Disease" ~ "IBD",
+                             index_surgery_indication == "FAP" ~ "FAP",
+                             TRUE ~ "Other"))
+```
+
+
+
+
+```{r table 1}
+library(table1)
+table1::label(df_i$age_of_ileostomy_site_neoplasm_diagnosis) <- "Age of Ileostomy Site Malignancy Diagnosis"
+table1::label(df_i$sex) <- "Sex"
+table1::label(df_i$race) <- "Race"
+table1::label(df_i$time_from_index_surgery_age_of_stoma) <- "Age of Stoma"
+table1::label(df_i$final_pathology) <- "Pathology"
+table1::label(df_i$malignant) <- "Pathology Potential"
+table1::label(df_i$index_surgery_indication) <- "Index Surgery Indication"
+table1::label(df_i$ibd_fap) <- "Generalized Surgery Indication"
+table1::label(df_i$survival_period_years) <- "Follow Up (Years)"
+table1::label(df_i$status) <- "Follow Up Status"
+
+
+table1::table1(~ age_of_ileostomy_site_neoplasm_diagnosis + 
+                 sex +
+                 race +
+                 time_from_index_surgery_age_of_stoma +
+                 final_pathology +
+                 malignant +
+                 index_surgery_indication +
+                 ibd_fap + 
+                 survival_period_years +
+                 status 
+               ,data = df_i)
+
+```
+
+### Pre-Malignant vs Malignant  
+```{r benign vs malignant}
+dependent = "malignant" 
+explanatory = c("age_of_ileostomy_site_neoplasm_diagnosis", "sex", "race","time_from_index_surgery_age_of_stoma", "final_pathology","index_surgery_indication", "ibd_fap")
+
+table <- df_i %>%
+  summary_factorlist(dependent, explanatory,
+                     p=TRUE, na_include = TRUE)
+
+knitr::kable(table, align=c("l", "l", "r", "r", "r"))
+```
+
+### Adenocarcinoma vs Squamous  
+```{r}
+dependent = "final_pathology" 
+explanatory = c("age_of_ileostomy_site_neoplasm_diagnosis", "sex", "race","time_from_index_surgery_age_of_stoma", "index_surgery_indication", "ibd_fap")
+
+table <- df_i %>%
+  filter(final_pathology == "Adenocarcinoma" | final_pathology == "Squamous Cell Carcinoma") %>%
+  summary_factorlist(dependent, explanatory,
+                     p=TRUE, na_include = TRUE)
+
+knitr::kable(table, align=c("l", "l", "r", "r", "r"))
+```
+
+### FAP vs IBD  
+```{r}
+dependent = "ibd_fap" 
+explanatory = c("age_of_ileostomy_site_neoplasm_diagnosis", "sex", "race","time_from_index_surgery_age_of_stoma", "final_pathology", "malignant", "index_surgery_indication")
+table <- df_i %>%
+  summary_factorlist(dependent, explanatory,
+                     p=TRUE, na_include = TRUE)
+
+knitr::kable(table, align=c("l", "l", "r", "r", "r"))
+```
+
+
+
