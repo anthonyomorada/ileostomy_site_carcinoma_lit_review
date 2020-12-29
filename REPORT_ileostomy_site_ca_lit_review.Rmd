@@ -55,6 +55,7 @@ We included `r nrow(df_i)` patients that were found in `r length(unique(df_i$cit
 summary(as.factor(ex_cit$exclusion_reason))
 ```
 
+
 ## Summary of Data  
 
 Malignant Etiology = Adenocarcinoma, Lymphoma, Melanoma, Neuroendocrine Tumor, Squamous Cell Carcinoma, Verrucous Carcinoma  
@@ -72,9 +73,6 @@ df_i <- df_i %>%
                              index_surgery_indication == "FAP" ~ "FAP",
                              TRUE ~ "Other"))
 ```
-
-
-
 
 ```{r table 1}
 library(table1)
@@ -104,7 +102,7 @@ table1::table1(~ age_of_ileostomy_site_neoplasm_diagnosis +
 
 ```
 
-### Pre-Malignant vs Malignant  
+## Pre-Malignant vs Malignant  
 ```{r benign vs malignant}
 dependent = "malignant" 
 explanatory = c("age_of_ileostomy_site_neoplasm_diagnosis", "sex", "race","time_from_index_surgery_age_of_stoma", "final_pathology","index_surgery_indication", "ibd_fap")
@@ -113,10 +111,10 @@ table <- df_i %>%
   summary_factorlist(dependent, explanatory,
                      p=TRUE, na_include = TRUE)
 
-knitr::kable(table, align=c("l", "l", "r", "r", "r"))
+knitr::kable(table)
 ```
 
-### Adenocarcinoma vs Squamous  
+## Adenocarcinoma vs Squamous  
 ```{r}
 dependent = "final_pathology" 
 explanatory = c("age_of_ileostomy_site_neoplasm_diagnosis", "sex", "race","time_from_index_surgery_age_of_stoma", "index_surgery_indication", "ibd_fap")
@@ -129,7 +127,7 @@ table <- df_i %>%
 knitr::kable(table, align=c("l", "l", "r", "r", "r"))
 ```
 
-### FAP vs IBD  
+## FAP vs IBD  
 ```{r}
 dependent = "ibd_fap" 
 explanatory = c("age_of_ileostomy_site_neoplasm_diagnosis", "sex", "race","time_from_index_surgery_age_of_stoma", "final_pathology", "malignant", "index_surgery_indication")

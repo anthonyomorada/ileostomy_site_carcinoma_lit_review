@@ -1,0 +1,286 @@
+---
+title: "Ileostomy Site Carcinoma Manuscript"
+author: "Anthony Morada"
+date: "12/14/2020"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+# Loading Data
+```{r setup, echo = FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+
+library(kableExtra)
+library(readxl)
+library(dplyr)
+library(janitor)
+library(table1)
+library(finalfit)
+library(tableone)
+
+
+df <- read_excel("~/THE GUTHRIE CLINIC/Foundation Research Projects - Ileostomy Site Carcinoma/case table.xlsx", na = "NA") 
+df <- df %>%
+  clean_names() %>%
+  filter(!is.na(exclusion))
+```
+The table has `r ncol(df)` columns and `r nrow(df)` rows.  
+
+# Full-Text Inclusion and Exclusion 
+```{r inclusion/exclusion}
+df_i <- df[df$exclusion == "No",]
+df_e <- df[df$exclusion == "Yes",]
+
+ex_cit <- subset(df_e, !(df_e$citation %in% df_i$citation)) %>%
+  select(citation, exclusion_reason) %>%
+  unique()
+```
+
+Our table contains `r length(unique(df$citation))` unique papers.  
+
+We included `r nrow(df_i)` patients that were found in `r length(unique(df_i$citation))` unique citations. We excluded `r nrow(ex_cit)` citations. Below is reason for full-text exclusions:  
+```{r printing exclusion reason summary}
+summary(as.factor(ex_cit$exclusion_reason))
+```
+
+# Cleaning Included Manuscripts
+
+```{r setting working data frame}
+df <- df_i
+rm(df_i, df_e, ex_cit)
+
+# Removing columns from editors
+df <- select(df, -checked_by_2_people, -comments, -chai, -harsha, -anthony, -amir, -exclusion, -exclusion_reason, -time_from_index_pathology_years, -patient_number)
+
+```
+
+__Creating Column for Malignant or Benign Etiology:__  
+  
+* Malignant Etiology = Adenocarcinoma, Lymphoma, Melanoma, Neuroendocrine Tumor, Squamous Cell Carcinoma, Verrucous Carcinoma  
+* Pre-Malignant Etiology = ESFA, Extramammary Paget Disease  
+  
+```{r cleaning}
+# Creating Malignant etiology column
+df$malignant <- grepl("Adenocarcinoma|Lymphoma|Melanoma|Neuroendocrine Tumor|Squamous Cell Carcinoma|Verrucous Carcinoma", df$final_pathology, ignore.case = T)
+df$malignant <- gsub(TRUE, "Malignant", df$malignant)
+df$malignant <- gsub(FALSE, "Pre-malignant", df$malignant)
+df$malignant <- as.factor(df$malignant)
+
+# Creating ibd-fap column
+df <- df %>%
+  mutate(ibd_fap = case_when(index_surgery_indication == "Ulcerative Colitis" ~ "IBD",
+                             index_surgery_indication == "Crohn's Disease" ~ "IBD",
+                             index_surgery_indication == "FAP" ~ "FAP",
+                             TRUE ~ "Other"))
+
+# Creating binary lymph, binary mets, and binary recurrence/mets column
+df <- df %>% 
+  mutate(binary_lymph = case_when(simple_lymph == "1" ~ "Positive",
+                                  simple_lymph == "3+" ~ "Positive",
+                                  is.na(simple_lymph) ~ NA_character_,
+                                  TRUE ~ "Negative"
+                                  )) %>%
+  mutate(binary_mets = case_when(metastasis == "Negative" ~ "Negative",
+                                 metastasis == "Positive" ~ "Positive",
+                                 is.na(metastasis) ~ NA_character_,
+                                 TRUE ~ "Positive")) %>%
+  mutate(binary_recurr = case_when(recurrance_mets_later == "none" ~ "Negative",
+                                   is.na(recurrance_mets_later) ~ NA_character_,
+                                   TRUE ~ "Positive"
+                                   )) %>%
+  mutate(ac_scc = case_when(final_pathology == "Adenocarcinoma" ~ "Adenocarcinoma",
+                             final_pathology == "Squamous Cell Carcinoma" ~ "Squamous Cell Carcinoma",
+                             is.na(final_pathology) ~ NA_character_,
+                             TRUE ~ "Other"
+                             ))
+
+# Making all character columns into factors
+df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)],  as.factor)
+
+#For TableOne
+kableone <- function(x, ...) {
+  capture.output(x <- print(x))
+  knitr::kable(x, ...)
+}
+
+```
+
+
+# Data Analysis  
+
+## Table 1  
+```{r table 1}
+#Variables for analysis
+vars = c("age_at_index_surgery", "age_of_ileostomy_site_neoplasm_diagnosis", "time_from_index_surgery_age_of_stoma", "sex", "race", "index_surgery_indication", "ibd_fap", "largest_dimension_cm", "biopsy_simplified", "time_between_initial_and_excisional_biopsies_year", "final_pathology", "ac_scc", "malignant" ,"binary_lymph","binary_mets","resection","fulguration","chemo","radiation","binary_recurr","survival_period_years","status")
+
+# Locating columns with non normal distribution
+cont_vars <- colnames(df[,sapply(df, function(x) is.numeric(x))])
+sapply(df[,cont_vars],shapiro.test)
+print(sapply(df[,cont_vars],shapiro.test))
+nonnorm_vars <- c("age_at_index_surgery","largest_dimension_cm","time_between_initial_and_excisional_biopsies_year", "survival_period_years")
+print(paste("Column with a non-normal distribution:", nonnorm_vars))
+
+#Print Table One
+kableone(print(
+  CreateTableOne(vars = vars, data = df), 
+  nonnormal = nonnorm_vars,
+  showAllLevels = TRUE,
+  missing = TRUE
+  ))
+
+```
+
+
+## Pre-Malignant vs Malignant  
+```{r}
+stratify <- "malignant"
+
+#Fisher's exact test
+fischer_var = c()
+cat_vars <- colnames(df[,sapply(df, function(x) is.factor(x))])
+cat_vars <- cat_vars[vars %in% cat_vars]
+for (i in 1:length(cat_vars)) {
+  if(sum(chisq.test(table(df[,cat_vars[i]][[1]],df[stratify][[1]]))$expected < 5) > 0) {
+    fischer_var[i] <- cat_vars[i]
+  }
+}
+
+kableone(print(
+  CreateTableOne(vars = vars, data = df, strata = stratify), 
+  nonnormal = nonnorm_vars,
+  exact = fischer_var,
+  showAllLevels = TRUE,
+  missing = TRUE
+  ))
+```
+
+## Adenocarcinoma vs Squamous  
+```{r}
+stratify <- "ac_scc"
+
+#Fisher's exact test
+fischer_var = c()
+cat_vars <- colnames(df[,sapply(df, function(x) is.factor(x))])
+cat_vars <- cat_vars[vars %in% cat_vars]
+for (i in 1:length(cat_vars)) {
+  if(sum(chisq.test(table(df[,cat_vars[i]][[1]],df[stratify][[1]]))$expected < 5) > 0) {
+    fischer_var[i] <- cat_vars[i]
+  }
+}
+
+kableone(print(
+  CreateTableOne(vars = vars, data = df, strata = stratify), 
+  nonnormal = nonnorm_vars,
+  exact = fischer_var,
+  showAllLevels = TRUE,
+  missing = TRUE
+  ))
+```
+
+## FAP vs IBD  
+```{r}
+stratify <- "ibd_fap"
+
+#Fisher's exact test
+fischer_var = c()
+cat_vars <- colnames(df[,sapply(df, function(x) is.factor(x))])
+cat_vars <- cat_vars[vars %in% cat_vars]
+for (i in 1:length(cat_vars)) {
+  if(sum(chisq.test(table(df[,cat_vars[i]][[1]],df[stratify][[1]]))$expected < 5) > 0) {
+    fischer_var[i] <- cat_vars[i]
+  }
+}
+
+kableone(print(
+  CreateTableOne(vars = vars, data = df, strata = stratify), 
+  nonnormal = nonnorm_vars,
+  exact = fischer_var,
+  showAllLevels = TRUE,
+  missing = TRUE
+  ))
+```
+
+## Mets and Recurrence
+```{r}
+stratify <- "binary_recurr"
+
+#Fisher's exact test
+fischer_var = c()
+cat_vars <- colnames(df[,sapply(df, function(x) is.factor(x))])
+cat_vars <- cat_vars[vars %in% cat_vars]
+for (i in 1:length(cat_vars)) {
+  if(sum(chisq.test(table(df[,cat_vars[i]][[1]],df[stratify][[1]]))$expected < 5) > 0) {
+    fischer_var[i] <- cat_vars[i]
+  }
+}
+
+kableone(print(
+  CreateTableOne(vars = vars, data = df, strata = stratify), 
+  nonnormal = nonnorm_vars,
+  exact = fischer_var,
+  showAllLevels = TRUE,
+  missing = TRUE
+  ))
+```
+
+## Presentation Frequency
+```{r}
+present <- unique(as.character(df$simple_presentation))
+present <- present[!is.na(present)]
+present <- paste(present, collapse = "; ")
+present <- strsplit(present, "; ")
+present <- present[[1]]
+present <- unique(present)
+```
+
+```{r}
+for(i in 1:length(present)){
+     print("--------------------------------------------------------------------------")
+     print(present[i])
+     print(sum(grepl(present[i],df$simple_presentation)))
+     print(table(grepl(present[i], df$simple_presentation), df$ibd_fap))
+     print(fisher.test(table(grepl(present[i], df$simple_presentation), df$ibd_fap))$p.value)
+     print(table(grepl(present[i], df$simple_presentation), df$ac_scc))
+     print(fisher.test(table(grepl(present[i], df$simple_presentation), df$ac_scc))$p.value)
+}
+```
+## Age of stoma  
+```{r}
+
+library(ggplot2)
+mu <- plyr::ddply(df, "ibd_fap", summarise, grp.mean=mean(time_from_index_surgery_age_of_stoma,na.rm = TRUE))
+mu <- filter(mu, !mu$ibd_fap == "Other")
+
+df %>%
+ filter(!is.na(time_from_index_surgery_age_of_stoma)) %>%
+ filter(!(ibd_fap %in% 
+    "Other")) %>%
+ ggplot() +
+ aes(x = time_from_index_surgery_age_of_stoma, fill = ac_scc) +
+ geom_histogram(bins = 30L) +
+ scale_fill_grey() +
+ geom_vline(data=mu, aes(xintercept=grp.mean, linetype=ibd_fap)) + 
+ labs(x = "Stoma Age (Years)", y = "Count", fill = "Ileostomy Pathology", linetype = "Initial Surgery Indication") +
+ theme_gray() +
+ facet_grid(vars(ibd_fap), vars())
+
+ggsave("age_of_stoma.tiff", 
+       width = 19.05, 
+       height = 22.23, 
+       units = "cm",
+       dpi = 300
+       )
+
+```
