@@ -150,7 +150,7 @@ stratify <- "malignant"
 #Fisher's exact test
 fischer_var = c()
 cat_vars <- colnames(df[,sapply(df, function(x) is.factor(x))])
-cat_vars <- cat_vars[vars %in% cat_vars]
+cat_vars <- cat_vars[cat_vars %in% vars]
 for (i in 1:length(cat_vars)) {
   if(sum(chisq.test(table(df[,cat_vars[i]][[1]],df[stratify][[1]]))$expected < 5) > 0) {
     fischer_var[i] <- cat_vars[i]
@@ -173,7 +173,7 @@ stratify <- "ac_scc"
 #Fisher's exact test
 fischer_var = c()
 cat_vars <- colnames(df[,sapply(df, function(x) is.factor(x))])
-cat_vars <- cat_vars[vars %in% cat_vars]
+cat_vars <- cat_vars[cat_vars %in% vars]
 for (i in 1:length(cat_vars)) {
   if(sum(chisq.test(table(df[,cat_vars[i]][[1]],df[stratify][[1]]))$expected < 5) > 0) {
     fischer_var[i] <- cat_vars[i]
@@ -282,5 +282,26 @@ ggsave("age_of_stoma.tiff",
        units = "cm",
        dpi = 300
        )
+
+```
+
+
+
+```{r}
+## Screening
+
+
+length((df[df$ibd_fap == "IBD",]$time_from_index_surgery_age_of_stoma >=25 | df[df$ibd_fap == "IBD",]$age_of_ileostomy_site_neoplasm_diagnosis >= 60) & 
+  (!is.na(df[df$ibd_fap == "IBD",]$time_from_index_surgery_age_of_stoma) & !is.na(df[df$ibd_fap == "IBD",]$age_of_ileostomy_site_neoplasm_diagnosis)))
+
+sum((df[df$ibd_fap == "IBD",]$time_from_index_surgery_age_of_stoma >=25 | df[df$ibd_fap == "IBD",]$age_of_ileostomy_site_neoplasm_diagnosis >= 60) & 
+  (!is.na(df[df$ibd_fap == "IBD",]$time_from_index_surgery_age_of_stoma) & !is.na(df[df$ibd_fap == "IBD",]$age_of_ileostomy_site_neoplasm_diagnosis)))
+
+
+length((df[df$ibd_fap == "FAP",]$time_from_index_surgery_age_of_stoma >=20 | df[df$ibd_fap == "FAP",]$age_of_ileostomy_site_neoplasm_diagnosis >= 50) & 
+  (!is.na(df[df$ibd_fap == "FAP",]$time_from_index_surgery_age_of_stoma) & !is.na(df[df$ibd_fap == "FAP",]$age_of_ileostomy_site_neoplasm_diagnosis)))
+
+sum((df[df$ibd_fap == "FAP",]$time_from_index_surgery_age_of_stoma >=20 | df[df$ibd_fap == "FAP",]$age_of_ileostomy_site_neoplasm_diagnosis >= 50) & 
+  (!is.na(df[df$ibd_fap == "FAP",]$time_from_index_surgery_age_of_stoma) & !is.na(df[df$ibd_fap == "FAP",]$age_of_ileostomy_site_neoplasm_diagnosis)))
 
 ```
