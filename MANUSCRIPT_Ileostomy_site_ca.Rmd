@@ -30,8 +30,7 @@ library(table1)
 library(finalfit)
 library(tableone)
 
-
-df <- read_excel("~/THE GUTHRIE CLINIC/Foundation Research Projects - Ileostomy Site Carcinoma/case table.xlsx", na = "NA") 
+df <- read_excel("~/Dropbox/research_files/ileostomy-site-carcinoma/case table.xlsx", na = "NA") 
 df <- df %>%
   clean_names() %>%
   filter(!is.na(exclusion))
@@ -270,7 +269,6 @@ df %>%
  ggplot() +
  aes(x = time_from_index_surgery_age_of_stoma, fill = ac_scc) +
  geom_histogram(bins = 30L) +
- scale_fill_grey() +
  geom_vline(data=mu, aes(xintercept=grp.mean, linetype=ibd_fap)) + 
  labs(x = "Stoma Age (Years)", y = "Count", fill = "Ileostomy Pathology", linetype = "Initial Surgery Indication") +
  theme_gray() +
